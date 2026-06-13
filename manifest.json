@@ -1,0 +1,19 @@
+{
+  "name": "Rabong - 낚시 후기",
+  "short_name": "Rabong",
+  "description": "낚시 후기를 공유하는 앱",
+  "start_url": "/Rabong-Report/",
+  "scope": "/Rabong-Report/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0a0a0a",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%23ffffff' width='192' height='192'/><text x='96' y='120' font-size='80' font-weight='bold' text-anchor='middle' fill='%230a0a0a' font-family='Arial'>🎣</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
