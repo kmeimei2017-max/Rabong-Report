@@ -477,30 +477,42 @@
 
   <script async src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0"></script>
   <script>
+    // Supabase 설정 (전역으로 설정)
+    const SUPABASE_URL = 'https://ivskjhdaymgvddzdk.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_K84QmooGQINkTmXUw1b-FQ_BXE-4exL';
+    const BUCKET_NAME = 'rabong-photos';
+
+    let supabaseClient = null;
+
     // Supabase 로드 대기
     function initSupabase() {
+      console.log('initSupabase 시작...');
+      console.log('window.supabase 존재?', !!window.supabase);
+
       if (!window.supabase) {
-        setTimeout(initSupabase, 100);
+        console.warn('Supabase 라이브러리가 아직 로드되지 않음. 0.5초 후 재시도...');
+        setTimeout(initSupabase, 500);
         return;
       }
 
-      // Supabase 설정
-      const SUPABASE_URL = 'https://ivskjhdaymgvddzdk.supabase.co';
-      const SUPABASE_KEY = 'sb_publishable_K84QmooGQINkTmXUw1b-FQ_BXE-4exL';
-      const BUCKET_NAME = 'rabong-photos';
+      try {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        console.log('✓ Supabase 클라이언트 초기화 완료');
+        console.log('URL:', SUPABASE_URL);
 
-      window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-      // 앱 초기화
-      loadTripsFromDatabase();
-      renderFeed();
+        // 앱 초기화
+        loadTripsFromDatabase();
+        renderFeed();
+      } catch (err) {
+        console.error('Supabase 초기화 오류:', err);
+      }
     }
 
-    // DOM 로드 후 Supabase 초기화
+    // 페이지 로드 완료 후 초기화
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', initSupabase);
     } else {
-      initSupabase();
+      setTimeout(initSupabase, 100);
     }
 
     let trips = [];
@@ -520,7 +532,7 @@
 
     async function loadTripsFromDatabase() {
       try {
-        const { data, error } = await window.supabaseClient
+        const { data, error } = await supabaseClient
           .from('trips')
           .select(`
             id,
@@ -680,7 +692,7 @@
         try {
           // Supabase에 파일 업로드
           const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${file.name}`;
-          const { data, error } = await window.supabaseClient.storage
+          const { data, error } = await supabaseClient.storage
             .from(BUCKET_NAME)
             .upload(fileName, file);
 
