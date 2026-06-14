@@ -4,6 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rabong - 낚시 후기</title>
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Rabong">
   <style>
     * {
       margin: 0;
@@ -45,55 +50,6 @@
 
     .page.active {
       display: flex;
-    }
-
-    /* 로그인 페이지 */
-    .login {
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-
-    .login-form {
-      width: 100%;
-      max-width: 400px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .login-title {
-      font-size: 32px;
-      font-weight: 700;
-      margin-bottom: 20px;
-      text-align: center;
-    }
-
-    .login-input {
-      width: 100%;
-      padding: 12px;
-      border: 1px solid var(--border-dark);
-      border-radius: 8px;
-      background: var(--bg-card);
-      color: var(--text-light);
-      font-size: var(--font-size);
-      font-family: inherit;
-    }
-
-    .login-input::placeholder {
-      color: var(--text-muted);
-    }
-
-    .login-btn {
-      width: 100%;
-      padding: 12px;
-      background: var(--text-light);
-      color: var(--bg-dark);
-      border: none;
-      border-radius: 8px;
-      font-size: var(--font-size);
-      font-weight: 600;
-      cursor: pointer;
     }
 
     /* 메인화면 */
@@ -469,18 +425,8 @@
 </head>
 <body>
   <div class="app">
-    <!-- 로그인 페이지 -->
-    <div id="loginPage" class="page login active">
-      <form class="login-form" onsubmit="handleLogin(event)">
-        <h1 class="login-title">Rabong</h1>
-        <input type="email" class="login-input" placeholder="이메일" required>
-        <input type="password" class="login-input" placeholder="비밀번호" required>
-        <button type="submit" class="login-btn">로그인</button>
-      </form>
-    </div>
-
     <!-- 메인화면 -->
-    <div id="homePage" class="page home-feed">
+    <div id="homePage" class="page home-feed active">
       <div class="feed-container" id="feedContainer"></div>
       <button class="fab" onclick="goToWrite()">+</button>
     </div>
@@ -489,13 +435,9 @@
     <div id="detailPage" class="page trip-detail">
       <div class="detail-header">
         <button class="back-btn" onclick="goToHome()">←</button>
-        <div class="detail-photo-count" id="photoCount">1/3</div>
         <button class="detail-edit-btn" onclick="goToEditTrip()">수정</button>
       </div>
       <div class="detail-body">
-        <div class="swipe-container" id="swipeContainer" ontouchstart="handleSwipeStart(event)" ontouchend="handleSwipeEnd(event)">
-          <img id="detailImage" class="swipe-image" src="" alt="사진">
-        </div>
         <div class="detail-content" id="detailContent"></div>
       </div>
     </div>
@@ -514,54 +456,49 @@
           <button class="photo-upload-btn" onclick="document.getElementById('photoInput').click()">
             ＋ 사진 추가하기
           </button>
-          <input id="photoInput" type="file" multiple accept="image/*" class="photo-input" onchange="handlePhotoSelect(event)">
-          <div class="photo-preview-grid" id="photoPreviewGrid"></div>
+          <input id="photoInput" type="file" accept="image/*" class="photo-input" onchange="handlePhotoSelect(event)">
+          <div id="photoPreview"></div>
         </div>
 
         <div class="form-section">
-          <label class="form-label">메인화면에 보일 한 줄 글</label>
+          <label class="form-label">제목</label>
           <textarea id="captionInput" class="form-input" placeholder="예: 2026.06.17 후포항 - 첫 출조" rows="2"></textarea>
         </div>
 
-        <div id="photoFormsContainer"></div>
+        <div class="form-section">
+          <label class="form-label">내용</label>
+          <textarea id="contentInput" class="form-input" placeholder="오늘의 낚시 후기를 적어주세요..." rows="6"></textarea>
+        </div>
       </div>
     </div>
   </div>
 
   <script>
+    // Service Worker 등록 (PWA)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').catch(err => {
+        console.log('Service Worker 등록 실패:', err);
+      });
+    }
+
     // 샘플 데이터
     let trips = [
       {
         id: '1',
         caption: '2026.06.17 후포항 - 첫 출조',
-        createdAt: new Date('2026-06-17'),
-        photos: [
-          { url: './참고사진/1-1.jpg', content: '아침 일찍 항구에 도착했어. 물때가 딱 좋았다.' },
-          { url: './참고사진/1-2.jpg', content: '포인트로 향하는 길. 파도가 조금 높긴 했지만 괜찮았어.' },
-          { url: './참고사진/1-3.jpg', content: '손에 잡혔다! 올해 첫 피시다.' },
-          { url: './참고사진/1-4.jpg', content: '친구가 잡은 게 더 크네. 역시 포인트를 많이 돌아야지.' },
-          { url: './참고사진/1-5.jpg', content: '4시간 정도 낚시했는데 정말 즐거웠어. 다음 주에 또 가야겠다.' }
-        ]
+        content: '아침 일찍 항구에 도착했어. 물때가 딱 좋았다. 포인트로 향하는 길에 파도가 조금 높긴 했지만 괜찮았어. 드디어 손에 잡혔다! 올해 첫 피시다. 친구가 잡은 게 더 크네. 역시 포인트를 많이 돌아야지. 4시간 정도 낚시했는데 정말 즐거웠어. 다음 주에 또 가야겠다.',
+        createdAt: new Date('2026-06-17')
       },
       {
         id: '2',
         caption: '2026.06.10 격포항 - 날씨 좋은 날',
-        createdAt: new Date('2026-06-10'),
-        photos: [
-          { url: './참고사진/2-1.jpg', content: '오늘 날씨가 진짜 좋다. 하늘이 맑고 파도도 잔잔해.' },
-          { url: './참고사진/2-2.jpg', content: '배 위에서의 풍경. 이게 낚시의 매력이야.' },
-          { url: './참고사진/2-3.jpg', content: '손맛이 느껴진다! 릴을 감으니까 무게가 있다.' },
-          { url: './참고사진/2-4.jpg', content: '오늘도 역시 대박이야. 이런 날이 자주 있으면 좋겠는데...' },
-          { url: './참고사진/2-5.jpg', content: '돌아오는 길. 졸음이 몰려온다. 하지만 행복한 피로야.' }
-        ]
+        content: '오늘 날씨가 진짜 좋다. 하늘이 맑고 파도도 잔잔해. 배 위에서의 풍경이 정말 멋져. 이게 낚시의 매력이다. 손맛이 느껴진다! 릴을 감으니까 무게가 있다. 오늘도 역시 대박이야. 이런 날이 자주 있으면 좋겠는데... 돌아오는 길에 졸음이 몰려온다. 하지만 행복한 피로야.',
+        createdAt: new Date('2026-06-10')
       }
     ];
 
-    let selectedPhotos = [];
-    let photoContents = {};
+    let selectedPhoto = null;
     let currentTripIndex = 0;
-    let currentPhotoIndex = 0;
-    let swipeStartX = null;
     let editingTripId = null;
 
     function showPage(pageId) {
@@ -569,58 +506,86 @@
       document.getElementById(pageId).classList.add('active');
     }
 
-    function handleLogin(event) {
-      event.preventDefault();
-      showPage('homePage');
-      renderFeed();
-    }
 
     function renderFeed() {
       const sorted = [...trips].sort((a, b) => b.createdAt - a.createdAt);
-      const html = sorted.map(trip => `
-        <div class="trip-card" onclick="viewTrip('${trip.id}')">
-          <img src="${trip.photos[0].url}" alt="${trip.caption}" onerror="this.style.display='none'">
-          <div class="trip-card-overlay">${trip.caption}</div>
-        </div>
-      `).join('');
+      const html = sorted.map(trip => {
+        if (trip.photo) {
+          return `
+            <div class="trip-card" style="position: relative;">
+              <img src="${trip.photo}" alt="${trip.caption}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" onclick="viewTrip('${trip.id}')">
+              <div class="trip-card-overlay" style="cursor: pointer;" onclick="viewTrip('${trip.id}')">${trip.caption}</div>
+              <button onclick="deleteTrip('${trip.id}')" style="position: absolute; top: 10px; right: 10px; width: 36px; height: 36px; border-radius: 50%; background: rgba(0, 0, 0, 0.6); color: white; border: none; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 10;">✕</button>
+            </div>
+          `;
+        } else {
+          return `
+            <div class="trip-card" style="position: relative;" onclick="viewTrip('${trip.id}')">
+              <div style="width: 100%; height: 100%; background: var(--bg-card); display: flex; align-items: center; justify-content: center; padding: 20px;">
+                <div style="text-align: center;">
+                  <div style="font-size: 18px; font-weight: 600; margin-bottom: 10px;">${trip.caption}</div>
+                  <div style="font-size: 14px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${trip.content}</div>
+                </div>
+              </div>
+              <button onclick="event.stopPropagation(); deleteTrip('${trip.id}')" style="position: absolute; top: 10px; right: 10px; width: 36px; height: 36px; border-radius: 50%; background: rgba(0, 0, 0, 0.6); color: white; border: none; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 10;">✕</button>
+            </div>
+          `;
+        }
+      }).join('');
       document.getElementById('feedContainer').innerHTML = html;
+    }
+
+    function handlePhotoSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        selectedPhoto = e.target.result; // base64 데이터
+        const preview = `
+          <div style="margin-top: 12px; border-radius: 8px; overflow: hidden;">
+            <img src="${selectedPhoto}" style="width: 100%; height: auto; max-height: 300px; object-fit: cover;">
+            <div style="text-align: center; margin-top: 8px; font-size: 14px; color: var(--text-muted);">
+              사진 선택됨
+              <button onclick="removePhoto()" style="margin-left: 8px; background: none; border: none; color: var(--text-light); cursor: pointer;">✕</button>
+            </div>
+          </div>
+        `;
+        document.getElementById('photoPreview').innerHTML = preview;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removePhoto() {
+      selectedPhoto = null;
+      document.getElementById('photoPreview').innerHTML = '';
+      document.getElementById('photoInput').value = '';
+    }
+
+    function deleteTrip(tripId) {
+      if (confirm('정말 삭제하시겠습니까?')) {
+        trips = trips.filter(t => t.id !== tripId);
+        localStorage.setItem('rabongTrips', JSON.stringify(trips));
+        renderFeed();
+      }
     }
 
     function viewTrip(tripId) {
       currentTripIndex = trips.findIndex(t => t.id === tripId);
-      currentPhotoIndex = 0;
       showPage('detailPage');
-      showPhoto();
+      showContent();
     }
 
-    function showPhoto() {
+    function showContent() {
       const trip = trips[currentTripIndex];
-      const photo = trip.photos[currentPhotoIndex];
-      document.getElementById('detailImage').src = photo.url;
-      document.getElementById('detailContent').textContent = photo.content;
-      document.getElementById('photoCount').textContent = `${currentPhotoIndex + 1}/${trip.photos.length}`;
-    }
+      let html = `<h2 style="margin-bottom: 20px; font-size: 24px;">${trip.caption}</h2>`;
 
-    function handleSwipeStart(e) {
-      swipeStartX = e.touches[0].clientX;
-    }
-
-    function handleSwipeEnd(e) {
-      if (!swipeStartX) return;
-      const trip = trips[currentTripIndex];
-      const touchEnd = e.changedTouches[0].clientX;
-      const diff = swipeStartX - touchEnd;
-
-      if (Math.abs(diff) < 30) return;
-
-      if (diff > 0 && currentPhotoIndex < trip.photos.length - 1) {
-        currentPhotoIndex++;
-        showPhoto();
-      } else if (diff < 0 && currentPhotoIndex > 0) {
-        currentPhotoIndex--;
-        showPhoto();
+      if (trip.photo) {
+        html += `<img src="${trip.photo}" style="width: 100%; height: auto; border-radius: 8px; margin-bottom: 20px;">`;
       }
-      swipeStartX = null;
+
+      html += `<p style="font-size: 16px; line-height: 1.8; white-space: pre-wrap;">${trip.content}</p>`;
+      document.getElementById('detailContent').innerHTML = html;
     }
 
     function goToHome() {
@@ -628,38 +593,38 @@
     }
 
     function goToWrite() {
-      selectedPhotos = [];
-      photoContents = {};
       editingTripId = null;
-      document.getElementById('photoInput').value = '';
+      selectedPhoto = null;
       document.getElementById('captionInput').value = '';
-      document.getElementById('photoPreviewGrid').innerHTML = '';
-      document.getElementById('photoFormsContainer').innerHTML = '';
+      document.getElementById('contentInput').value = '';
+      document.getElementById('photoPreview').innerHTML = '';
+      document.getElementById('photoInput').value = '';
       showPage('writePage');
-      loadTempData();
     }
 
     function goToEditTrip() {
       const trip = trips[currentTripIndex];
       editingTripId = trip.id;
 
-      selectedPhotos = trip.photos.map(photo => ({
-        preview: photo.url,
-        file: null
-      }));
-
       document.getElementById('captionInput').value = trip.caption;
+      document.getElementById('contentInput').value = trip.content;
 
-      trip.photos.forEach((photo, index) => {
-        photoContents[index] = photo.content;
-      });
-
-      document.getElementById('photoInput').value = '';
-      document.getElementById('photoPreviewGrid').innerHTML = '';
-      document.getElementById('photoFormsContainer').innerHTML = '';
-
-      renderPhotoPreview();
-      renderPhotoForms();
+      if (trip.photo) {
+        selectedPhoto = trip.photo;
+        const preview = `
+          <div style="margin-top: 12px; border-radius: 8px; overflow: hidden;">
+            <img src="${trip.photo}" style="width: 100%; height: auto; max-height: 300px; object-fit: cover;">
+            <div style="text-align: center; margin-top: 8px; font-size: 14px; color: var(--text-muted);">
+              사진 선택됨
+              <button onclick="removePhoto()" style="margin-left: 8px; background: none; border: none; color: var(--text-light); cursor: pointer;">✕</button>
+            </div>
+          </div>
+        `;
+        document.getElementById('photoPreview').innerHTML = preview;
+      } else {
+        selectedPhoto = null;
+        document.getElementById('photoPreview').innerHTML = '';
+      }
 
       showPage('writePage');
     }
@@ -754,8 +719,10 @@
 
     function handleSaveTrip() {
       const caption = document.getElementById('captionInput').value.trim();
-      if (!caption || selectedPhotos.length === 0) {
-        alert('한 줄 글과 사진을 모두 추가해주세요.');
+      const content = document.getElementById('contentInput').value.trim();
+
+      if (!caption || !content) {
+        alert('제목과 내용을 모두 입력해주세요.');
         return;
       }
 
@@ -766,10 +733,8 @@
           trips[tripIndex] = {
             ...trips[tripIndex],
             caption,
-            photos: selectedPhotos.map((photo, index) => ({
-              url: photo.preview,
-              content: photoContents[index] || ''
-            }))
+            content,
+            photo: selectedPhoto || trips[tripIndex].photo
           };
         }
         editingTripId = null;
@@ -778,19 +743,37 @@
         const newTrip = {
           id: Date.now().toString(),
           caption,
-          createdAt: new Date(),
-          photos: selectedPhotos.map((photo, index) => ({
-            url: photo.preview,
-            content: photoContents[index] || ''
-          }))
+          content,
+          photo: selectedPhoto,
+          createdAt: new Date()
         };
         trips.unshift(newTrip);
       }
 
+      // localStorage에 저장
+      localStorage.setItem('rabongTrips', JSON.stringify(trips));
       localStorage.removeItem('rabongTempData');
+      selectedPhoto = null;
+      document.getElementById('photoPreview').innerHTML = '';
+      document.getElementById('photoInput').value = '';
       showPage('homePage');
       renderFeed();
     }
+
+    // localStorage에서 이전 후기 로드
+    function loadTripsFromStorage() {
+      const stored = localStorage.getItem('rabongTrips');
+      if (stored) {
+        try {
+          trips = JSON.parse(stored);
+        } catch (e) {
+          console.log('저장된 데이터를 불러올 수 없습니다.');
+        }
+      }
+    }
+
+    // 앱 시작 시 로드
+    loadTripsFromStorage();
 
     // 초기 렌더링
     renderFeed();
