@@ -475,10 +475,16 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    // 샘플 데이터 (임시 비움 - localStorage 테스트용)
-    let trips = [];
+    // Supabase 설정
+    const SUPABASE_URL = 'https://ivskjhdaymgvddzdk.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_K84QmooGQINkTmXUw1b-FQ_BXE-4exL';
+    const BUCKET_NAME = 'rabong-photos';
 
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let trips = [];
     let selectedPhotos = [];
     let photoContents = {};
     let currentTripIndex = 0;
@@ -493,20 +499,39 @@
 
 
 
-    function loadTripsFromStorage() {
-      const stored = localStorage.getItem('rabongTrips');
-      if (stored) {
-        try {
-          trips = JSON.parse(stored);
-          // 이전 형식 데이터 마이그레이션 (createdAt 문자열 → Date 객체)
-          trips = trips.map(trip => ({
-            ...trip,
-            createdAt: typeof trip.createdAt === 'string' ? new Date(trip.createdAt) : trip.createdAt,
-            photos: trip.photos || [] // photos 필드 없으면 빈 배열로
-          }));
-        } catch (e) {
-          console.log('저장된 데이터를 불러올 수 없습니다.', e);
+    async function loadTripsFromDatabase() {
+      try {
+        const { data, error } = await supabase
+          .from('trips')
+          .select(`
+            id,
+            caption,
+            content,
+            createdAt,
+            photos (
+              id,
+              url,
+              fileName,
+              content,
+              "order"
+            )
+          `)
+          .order('createdAt', { ascending: false });
+
+        if (error) {
+          console.error('데이터 로드 실패:', error);
+          return;
         }
+
+        trips = (data || []).map(trip => ({
+          ...trip,
+          createdAt: new Date(trip.createdAt),
+          photos: trip.photos || []
+        }));
+
+        console.log('Database에서 로드됨:', trips);
+      } catch (err) {
+        console.error('데이터 로드 중 오류:', err);
       }
     }
 
@@ -608,13 +633,15 @@
 
       selectedPhotos = trip.photos.map(photo => ({
         preview: photo.url,
-        file: null
+        file: null,
+        fileName: photo.fileName
       }));
 
       document.getElementById('captionInput').value = trip.caption;
+      document.getElementById('contentInput').value = trip.content || '';
 
       trip.photos.forEach((photo, index) => {
-        photoContents[index] = photo.content;
+        photoContents[index] = photo.content || '';
       });
 
       document.getElementById('photoInput').value = '';
@@ -627,13 +654,39 @@
       showPage('writePage');
     }
 
-    function handlePhotoSelect(event) {
+    async function handlePhotoSelect(event) {
       const files = Array.from(event.target.files);
-      const newPhotos = files.map(file => ({
-        file,
-        preview: URL.createObjectURL(file)
-      }));
-      selectedPhotos = selectedPhotos.concat(newPhotos);
+
+      for (const file of files) {
+        try {
+          // Supabase에 파일 업로드
+          const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${file.name}`;
+          const { data, error } = await supabase.storage
+            .from(BUCKET_NAME)
+            .upload(fileName, file);
+
+          if (error) {
+            alert(`업로드 실패: ${error.message}`);
+            continue;
+          }
+
+          // 공개 URL 가져오기
+          const { data: publicData } = supabase.storage
+            .from(BUCKET_NAME)
+            .getPublicUrl(fileName);
+
+          selectedPhotos.push({
+            file: file,
+            preview: publicData.publicUrl,
+            fileName: fileName
+          });
+
+          console.log('사진 업로드 성공:', fileName);
+        } catch (err) {
+          alert('업로드 중 오류가 발생했습니다: ' + err.message);
+        }
+      }
+
       renderPhotoPreview();
       renderPhotoForms();
     }
@@ -648,7 +701,22 @@
       document.getElementById('photoPreviewGrid').innerHTML = html;
     }
 
-    function removePhoto(index) {
+    async function removePhoto(index) {
+      const photo = selectedPhotos[index];
+
+      // Supabase에서 파일 삭제
+      if (photo.fileName) {
+        const { error } = await supabase.storage
+          .from(BUCKET_NAME)
+          .remove([photo.fileName]);
+
+        if (error) {
+          console.warn('파일 삭제 실패:', error);
+        } else {
+          console.log('파일 삭제 성공:', photo.fileName);
+        }
+      }
+
       selectedPhotos.splice(index, 1);
       delete photoContents[index];
       renderPhotoPreview();
@@ -715,73 +783,98 @@
       }
     }
 
-    function handleSaveTrip() {
+    async function handleSaveTrip() {
       const caption = document.getElementById('captionInput').value.trim();
       const content = document.getElementById('contentInput').value.trim();
 
-      // 제목 또는 내용 중 하나라도 있으면 저장 가능
       if (!caption && !content) {
         alert('제목 또는 내용을 입력해주세요.');
         return;
       }
 
-      if (editingTripId) {
-        // 기존 항목 수정
-        const tripIndex = trips.findIndex(t => t.id === editingTripId);
-        if (tripIndex !== -1) {
-          trips[tripIndex] = {
-            ...trips[tripIndex],
-            caption,
-            content,
-            photos: selectedPhotos.length > 0 ? selectedPhotos.map((photo, index) => ({
+      try {
+        if (editingTripId) {
+          // 기존 항목 수정
+          const { error: updateError } = await supabase
+            .from('trips')
+            .update({ caption, content, updatedAt: new Date().toISOString() })
+            .eq('id', editingTripId);
+
+          if (updateError) throw updateError;
+
+          // 기존 사진 삭제
+          await supabase.from('photos').delete().eq('trip_id', editingTripId);
+
+          // 새로운 사진 추가
+          if (selectedPhotos.length > 0) {
+            const photosData = selectedPhotos.map((photo, index) => ({
+              trip_id: editingTripId,
               url: photo.preview,
-              content: photoContents[index] || ''
-            })) : []
-          };
+              fileName: photo.fileName,
+              content: photoContents[index] || '',
+              order: index
+            }));
+
+            const { error: photosError } = await supabase
+              .from('photos')
+              .insert(photosData);
+
+            if (photosError) throw photosError;
+          }
+
+          editingTripId = null;
+        } else {
+          // 새로운 항목 추가
+          const { data: tripData, error: insertError } = await supabase
+            .from('trips')
+            .insert([{ caption, content, createdAt: new Date().toISOString() }])
+            .select();
+
+          if (insertError) throw insertError;
+
+          const tripId = tripData[0].id;
+
+          // 사진 추가
+          if (selectedPhotos.length > 0) {
+            const photosData = selectedPhotos.map((photo, index) => ({
+              trip_id: tripId,
+              url: photo.preview,
+              fileName: photo.fileName,
+              content: photoContents[index] || '',
+              order: index
+            }));
+
+            const { error: photosError } = await supabase
+              .from('photos')
+              .insert(photosData);
+
+            if (photosError) throw photosError;
+          }
         }
-        editingTripId = null;
-      } else {
-        // 새로운 항목 추가
-        const newTrip = {
-          id: Date.now().toString(),
-          caption,
-          content,
-          createdAt: new Date(),
-          photos: selectedPhotos.length > 0 ? selectedPhotos.map((photo, index) => ({
-            url: photo.preview,
-            content: photoContents[index] || ''
-          })) : []
-        };
-        trips.unshift(newTrip);
+
+        localStorage.removeItem('rabongTempData');
+
+        document.getElementById('captionInput').value = '';
+        document.getElementById('contentInput').value = '';
+        selectedPhotos = [];
+        photoContents = {};
+
+        await loadTripsFromDatabase();
+        showPage('homePage');
+        renderFeed();
+
+        alert('저장되었습니다!');
+      } catch (err) {
+        console.error('저장 중 오류:', err);
+        alert('저장 실패: ' + err.message);
       }
+    }
 
-      localStorage.removeItem('rabongTempData');
-      localStorage.setItem('rabongTrips', JSON.stringify(trips));
-
-      document.getElementById('captionInput').value = '';
-      document.getElementById('contentInput').value = '';
-      showPage('homePage');
+    // 초기화 - Database에서 데이터 로드
+    (async () => {
+      await loadTripsFromDatabase();
       renderFeed();
-    }
-
-    // 초기화
-    loadTripsFromStorage();
-
-    // 디버깅: localStorage가 비어있으면 샘플 데이터로 테스트
-    if (trips.length === 0) {
-      console.warn('localStorage가 비어있음. 샘플 데이터 추가됨.');
-      trips = [
-        {
-          id: '1',
-          caption: '후포항 출조기',
-          content: '오늘 후포항에서 정말 멋진 낚시를 했습니다. 날씨도 좋았고 물고기도 많이 잡았어요!',
-          photos: [],
-          createdAt: new Date()
-        }
-      ];
-    }
-
-    renderFeed();
+    })();
   </script>
 </body>
 </html>
