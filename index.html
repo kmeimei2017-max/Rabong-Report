@@ -475,14 +475,33 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script async src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0"></script>
   <script>
-    // Supabase 설정
-    const SUPABASE_URL = 'https://ivskjhdaymgvddzdk.supabase.co';
-    const SUPABASE_KEY = 'sb_publishable_K84QmooGQINkTmXUw1b-FQ_BXE-4exL';
-    const BUCKET_NAME = 'rabong-photos';
+    // Supabase 로드 대기
+    function initSupabase() {
+      if (!window.supabase) {
+        setTimeout(initSupabase, 100);
+        return;
+      }
 
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      // Supabase 설정
+      const SUPABASE_URL = 'https://ivskjhdaymgvddzdk.supabase.co';
+      const SUPABASE_KEY = 'sb_publishable_K84QmooGQINkTmXUw1b-FQ_BXE-4exL';
+      const BUCKET_NAME = 'rabong-photos';
+
+      window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+      // 앱 초기화
+      loadTripsFromDatabase();
+      renderFeed();
+    }
+
+    // DOM 로드 후 Supabase 초기화
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initSupabase);
+    } else {
+      initSupabase();
+    }
 
     let trips = [];
     let selectedPhotos = [];
@@ -501,7 +520,7 @@
 
     async function loadTripsFromDatabase() {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await window.supabaseClient
           .from('trips')
           .select(`
             id,
@@ -661,7 +680,7 @@
         try {
           // Supabase에 파일 업로드
           const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${file.name}`;
-          const { data, error } = await supabase.storage
+          const { data, error } = await window.supabaseClient.storage
             .from(BUCKET_NAME)
             .upload(fileName, file);
 
@@ -870,11 +889,7 @@
       }
     }
 
-    // 초기화 - Database에서 데이터 로드
-    (async () => {
-      await loadTripsFromDatabase();
-      renderFeed();
-    })();
+    // 초기화는 initSupabase() 함수에서 처리됨
   </script>
 </body>
 </html>
