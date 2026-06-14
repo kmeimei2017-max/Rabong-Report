@@ -735,10 +735,27 @@
         trips.unshift(newTrip);
       }
 
+      // localStorage에 저장
+      localStorage.setItem('rabongTrips', JSON.stringify(trips));
       localStorage.removeItem('rabongTempData');
       showPage('homePage');
       renderFeed();
     }
+
+    // localStorage에서 이전 후기 로드
+    function loadTripsFromStorage() {
+      const stored = localStorage.getItem('rabongTrips');
+      if (stored) {
+        try {
+          trips = JSON.parse(stored);
+        } catch (e) {
+          console.log('저장된 데이터를 불러올 수 없습니다.');
+        }
+      }
+    }
+
+    // 앱 시작 시 로드
+    loadTripsFromStorage();
 
     // 초기 렌더링
     renderFeed();
