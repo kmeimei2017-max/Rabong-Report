@@ -548,12 +548,25 @@
 
     function renderFeed() {
       const sorted = [...trips].sort((a, b) => b.createdAt - a.createdAt);
-      const html = sorted.map(trip => `
-        <div class="trip-card" onclick="viewTrip('${trip.id}')">
-          <img src="${trip.photos[0].url}" alt="${trip.caption}" onerror="this.style.display='none'">
-          <div class="trip-card-overlay">${trip.caption}</div>
-        </div>
-      `).join('');
+      const html = sorted.map(trip => {
+        if (trip.photos && trip.photos.length > 0) {
+          return `
+            <div class="trip-card" onclick="viewTrip('${trip.id}')">
+              <img src="${trip.photos[0].url}" alt="${trip.caption}" onerror="this.style.display='none'">
+              <div class="trip-card-overlay">${trip.caption}</div>
+            </div>
+          `;
+        } else {
+          return `
+            <div class="trip-card" onclick="viewTrip('${trip.id}')" style="background: var(--bg-card); display: flex; align-items: center; justify-content: center; padding: 20px;">
+              <div style="text-align: center;">
+                <div style="font-size: 18px; font-weight: 600;">${trip.caption}</div>
+                <div style="font-size: 14px; color: var(--text-muted); margin-top: 10px;">${trip.content}</div>
+              </div>
+            </div>
+          `;
+        }
+      }).join('');
       document.getElementById('feedContainer').innerHTML = html;
     }
 
