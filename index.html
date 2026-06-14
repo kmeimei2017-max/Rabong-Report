@@ -484,35 +484,26 @@
 
     let supabaseClient = null;
 
-    // Supabase 로드 대기
+    // 초기화 - Supabase 클라이언트 설정
     function initSupabase() {
-      console.log('initSupabase 시작...');
-      console.log('window.supabase 존재?', !!window.supabase);
-
       if (!window.supabase) {
-        console.warn('Supabase 라이브러리가 아직 로드되지 않음. 0.5초 후 재시도...');
-        setTimeout(initSupabase, 500);
+        setTimeout(initSupabase, 100);
         return;
       }
-
-      try {
-        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        console.log('✓ Supabase 클라이언트 초기화 완료');
-        console.log('URL:', SUPABASE_URL);
-
-        // 앱 초기화
-        loadTripsFromDatabase();
-        renderFeed();
-      } catch (err) {
-        console.error('Supabase 초기화 오류:', err);
-      }
+      supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     }
 
-    // 페이지 로드 완료 후 초기화
+    // Supabase 클라이언트 초기화 후 앱 시작
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initSupabase);
+      document.addEventListener('DOMContentLoaded', () => {
+        initSupabase();
+        loadTripsFromStorage();
+        renderFeed();
+      });
     } else {
-      setTimeout(initSupabase, 100);
+      initSupabase();
+      loadTripsFromStorage();
+      renderFeed();
     }
 
     let trips = [];
@@ -530,39 +521,20 @@
 
 
 
-    async function loadTripsFromDatabase() {
-      try {
-        const { data, error } = await supabaseClient
-          .from('trips')
-          .select(`
-            id,
-            caption,
-            content,
-            createdAt,
-            photos (
-              id,
-              url,
-              fileName,
-              content,
-              "order"
-            )
-          `)
-          .order('createdAt', { ascending: false });
-
-        if (error) {
-          console.error('데이터 로드 실패:', error);
-          return;
+    function loadTripsFromStorage() {
+      const stored = localStorage.getItem('rabongTrips');
+      if (stored) {
+        try {
+          trips = JSON.parse(stored);
+          trips = trips.map(trip => ({
+            ...trip,
+            createdAt: new Date(trip.createdAt),
+            photos: trip.photos || []
+          }));
+          console.log('localStorage에서 로드됨:', trips);
+        } catch (e) {
+          console.error('데이터 로드 실패:', e);
         }
-
-        trips = (data || []).map(trip => ({
-          ...trip,
-          createdAt: new Date(trip.createdAt),
-          photos: trip.photos || []
-        }));
-
-        console.log('Database에서 로드됨:', trips);
-      } catch (err) {
-        console.error('데이터 로드 중 오류:', err);
       }
     }
 
@@ -732,22 +704,7 @@
       document.getElementById('photoPreviewGrid').innerHTML = html;
     }
 
-    async function removePhoto(index) {
-      const photo = selectedPhotos[index];
-
-      // Supabase에서 파일 삭제
-      if (photo.fileName) {
-        const { error } = await supabase.storage
-          .from(BUCKET_NAME)
-          .remove([photo.fileName]);
-
-        if (error) {
-          console.warn('파일 삭제 실패:', error);
-        } else {
-          console.log('파일 삭제 성공:', photo.fileName);
-        }
-      }
-
+    function removePhoto(index) {
       selectedPhotos.splice(index, 1);
       delete photoContents[index];
       renderPhotoPreview();
@@ -814,7 +771,7 @@
       }
     }
 
-    async function handleSaveTrip() {
+    function handleSaveTrip() {
       const caption = document.getElementById('captionInput').value.trim();
       const content = document.getElementById('contentInput').value.trim();
 
@@ -826,71 +783,44 @@
       try {
         if (editingTripId) {
           // 기존 항목 수정
-          const { error: updateError } = await supabase
-            .from('trips')
-            .update({ caption, content, updatedAt: new Date().toISOString() })
-            .eq('id', editingTripId);
-
-          if (updateError) throw updateError;
-
-          // 기존 사진 삭제
-          await supabase.from('photos').delete().eq('trip_id', editingTripId);
-
-          // 새로운 사진 추가
-          if (selectedPhotos.length > 0) {
-            const photosData = selectedPhotos.map((photo, index) => ({
-              trip_id: editingTripId,
-              url: photo.preview,
-              fileName: photo.fileName,
-              content: photoContents[index] || '',
-              order: index
-            }));
-
-            const { error: photosError } = await supabase
-              .from('photos')
-              .insert(photosData);
-
-            if (photosError) throw photosError;
+          const tripIndex = trips.findIndex(t => t.id === editingTripId);
+          if (tripIndex !== -1) {
+            trips[tripIndex] = {
+              ...trips[tripIndex],
+              caption,
+              content,
+              photos: selectedPhotos.map((photo, index) => ({
+                url: photo.preview,
+                fileName: photo.fileName,
+                content: photoContents[index] || ''
+              }))
+            };
           }
-
           editingTripId = null;
         } else {
           // 새로운 항목 추가
-          const { data: tripData, error: insertError } = await supabase
-            .from('trips')
-            .insert([{ caption, content, createdAt: new Date().toISOString() }])
-            .select();
-
-          if (insertError) throw insertError;
-
-          const tripId = tripData[0].id;
-
-          // 사진 추가
-          if (selectedPhotos.length > 0) {
-            const photosData = selectedPhotos.map((photo, index) => ({
-              trip_id: tripId,
+          const newTrip = {
+            id: Date.now().toString(),
+            caption,
+            content,
+            createdAt: new Date(),
+            photos: selectedPhotos.map((photo, index) => ({
               url: photo.preview,
               fileName: photo.fileName,
-              content: photoContents[index] || '',
-              order: index
-            }));
-
-            const { error: photosError } = await supabase
-              .from('photos')
-              .insert(photosData);
-
-            if (photosError) throw photosError;
-          }
+              content: photoContents[index] || ''
+            }))
+          };
+          trips.unshift(newTrip);
         }
 
         localStorage.removeItem('rabongTempData');
+        localStorage.setItem('rabongTrips', JSON.stringify(trips));
 
         document.getElementById('captionInput').value = '';
         document.getElementById('contentInput').value = '';
         selectedPhotos = [];
         photoContents = {};
 
-        await loadTripsFromDatabase();
         showPage('homePage');
         renderFeed();
 
