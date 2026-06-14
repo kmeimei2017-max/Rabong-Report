@@ -702,8 +702,8 @@
 
     function handleSaveTrip() {
       const caption = document.getElementById('captionInput').value.trim();
-      if (!caption || selectedPhotos.length === 0) {
-        alert('한 줄 글과 사진을 모두 추가해주세요.');
+      if (!caption) {
+        alert('한 줄 글을 입력해주세요.');
         return;
       }
 
