@@ -52,55 +52,6 @@
       display: flex;
     }
 
-    /* 로그인 페이지 */
-    .login {
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-
-    .login-form {
-      width: 100%;
-      max-width: 400px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .login-title {
-      font-size: 32px;
-      font-weight: 700;
-      margin-bottom: 20px;
-      text-align: center;
-    }
-
-    .login-input {
-      width: 100%;
-      padding: 12px;
-      border: 1px solid var(--border-dark);
-      border-radius: 8px;
-      background: var(--bg-card);
-      color: var(--text-light);
-      font-size: var(--font-size);
-      font-family: inherit;
-    }
-
-    .login-input::placeholder {
-      color: var(--text-muted);
-    }
-
-    .login-btn {
-      width: 100%;
-      padding: 12px;
-      background: var(--text-light);
-      color: var(--bg-dark);
-      border: none;
-      border-radius: 8px;
-      font-size: var(--font-size);
-      font-weight: 600;
-      cursor: pointer;
-    }
-
     /* 메인화면 */
     .home-feed {
       flex: 1;
@@ -474,18 +425,8 @@
 </head>
 <body>
   <div class="app">
-    <!-- 로그인 페이지 -->
-    <div id="loginPage" class="page login active">
-      <form class="login-form" onsubmit="handleLogin(event)">
-        <h1 class="login-title">Rabong</h1>
-        <input type="email" class="login-input" placeholder="이메일" required>
-        <input type="password" class="login-input" placeholder="비밀번호" required>
-        <button type="submit" class="login-btn">로그인</button>
-      </form>
-    </div>
-
     <!-- 메인화면 -->
-    <div id="homePage" class="page home-feed">
+    <div id="homePage" class="page home-feed active">
       <div class="feed-container" id="feedContainer"></div>
       <button class="fab" onclick="goToWrite()">+</button>
     </div>
@@ -581,11 +522,6 @@
       document.getElementById(pageId).classList.add('active');
     }
 
-    function handleLogin(event) {
-      event.preventDefault();
-      showPage('homePage');
-      renderFeed();
-    }
 
     function renderFeed() {
       const sorted = [...trips].sort((a, b) => b.createdAt - a.createdAt);
