@@ -1,3 +1,15 @@
 {
-  "outputStyle": "RabongStyle"
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit -m '초기화: 처음부터 다시 시작 \\(로컬과 모바일 작동 확인용\\) *)",
+      "Bash(git push *)",
+      "Bash(git pull *)",
+      "Bash(git checkout *)",
+      "Bash(git commit *)",
+      "Skill(run)",
+      "Skill(run:*)"
+    ]
+  },
+  "outputStyle": "explanatory"
 }
